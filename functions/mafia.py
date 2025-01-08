@@ -1,332 +1,17 @@
-# Libraries
 import disnake
-import playhouse.sqlite_ext
-from disnake.ext import commands
-from disnake import TextInputStyle
-import asyncio
-import datetime
-# import os
-# import sqlite3
-from peewee import *
-# import pickle
-import string
-import random
-from playhouse.sqlite_ext import JSONField
-from time import sleep
-# import re
+from init import Players, bot, Mafia
 from variables import *
-from secret import TOKEN
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-intents = disnake.Intents.default()
-intents.members = True  # Включение намерений для работы с членами сервера
-intents.messages = True  # Если нужен доступ к сообщениям
-intents.guilds = True    # Для работы с серверами
-intents.guild_messages = True  # Для доступа к сообщениям в каналах
-bot = commands.Bot("!", sync_commands_debug=True, intents=intents)
-db = SqliteDatabase('svr.db')
-
-
-class SERVERMODEL(Model):
-    class Meta:
-        database = db
-
-
-class Tickets(SERVERMODEL):
-    creator = IntegerField(null=False)  # dsc id создателя обращения
-    thread = IntegerField(null=False)  # dsc id ветки обращения
-    status = TextField(null=False)  # Статус обращения
-    create_date = DateTimeField(null=False)  # Дата и время создания обращения
-    start_msg = IntegerField(null=False)  # dsc id сообщения заявки
-
-
-class Users(SERVERMODEL):
-    discord_id = IntegerField(null=False)  # dsc id пользователя
-    support_cooldown = DateTimeField(null=True)  # Дата и время когда пользователь создал последнее обращение
-
-
-Tickets.create_table()
-Users.create_table()
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-
-# Check
-@bot.event
-async def on_ready():
-    print(f'Бот запущен. Я - {bot.user}')
-    await bot.change_presence(
-        activity=disnake.Activity(type=disnake.ActivityType.custom, name="tusovwka", state="Тестируется"))
-    chat_chat = await bot.fetch_channel(CHAT)
-    # await chat_chat.send("## Всем привет! Я снова в сети и служу Наша Туса.")
-    mfgame_object = Mafia.get_or_none(crush_status="Crush me")
-    while mfgame_object is not None:
-        if (mfgame_object.status == "Registration_open") or (mfgame_object.status == "Registration_private_open"):
-            mafia_chat_object = await bot.fetch_channel(MAFIA)
-            # await mafia_chat_object.send("## Всем привет! Я снова в сети и служу Наша Туса.")
-            await mafia_reg_crush(mfgame_object)
-        else:
-            await mafia_crush(mfgame_object)
-        mfgame_object = Mafia.get_or_none(crush_status="Crush me")
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-
-# MusicClear
-@bot.event
-async def on_message(message):
-    if (message.channel.id == MUSIC):
-        await asyncio.sleep(4)  # Задержка в 4 секунды
-        await message.delete()  # Удаление сообщения
-
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-# /verify
-@bot.slash_command(description="Повторная верификация", guild_ids=[servers])
-async def verify(inter):
-    await inter.response.defer(ephemeral=True)
-    guild = bot.get_guild(servers)
-    role = guild.get_role(VERIFY)
-
-    if role is None:
-        await inter.send("Роль верификации устарела.", ephemeral=True)
-    for member in guild.members:
-        await member.add_roles(role)
-
-    await inter.send("Все участники должны заново пройти верификацию", ephemeral=True)
-
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-# /update
-@bot.slash_command(description="Раздает роль обновления", guild_ids=[servers])
-async def update(
-    inter,
-        status=disnake.ext.commands.Param(name='on_or_off', description='Выбор', choices=['вкл', 'выкл'])):
-    await inter.response.defer(ephemeral=True)
-    guild = bot.get_guild(servers)
-    role = guild.get_role(UPDATE)
-    if status == 'вкл':
-        if role is None:
-            await inter.send("Роль обновления устарела устарела.", ephemeral=True)
-        for member in guild.members:
-            await member.add_roles(role)
-
-        await inter.send("Режим обновления включен", ephemeral=True)
-    elif status == 'выкл':
-        for member in guild.members:
-            await member.remove_roles(role)
-        await inter.send("Режим обновления выключен")
-    else:
-        await inter.send("Ошибочка :(")
-
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-# /giveaway
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-# /support
-support_cooldown = {}
-
-
-@bot.slash_command(description='Отправляет сообщение для приема обращений', guild_ids=[servers])
-async def support(inter):
-    support_open = open("documents/support.txt", "r", encoding="utf-8")
-    support_text = support_open.read()
-    await inter.send(
-        support_text,
-        components=[disnake.ui.Button(label="Создать обращение", style=disnake.ButtonStyle.success,
-                                      custom_id="create_support_ticket")])
-
-
-class SupportModal(disnake.ui.Modal):
-    def __init__(self):
-        # Детали модального окна и его компонентов
-        components = [
-            disnake.ui.TextInput(
-                label="Обращение",
-                placeholder="",
-                custom_id="ticket",
-                style=TextInputStyle.paragraph,
-                min_length=12,
-                max_length=3750
-            ),
-        ]
-        super().__init__(
-            title="Создание обращения",
-            custom_id="create_ticket",
-            components=components,
-        )
-
-    # Обработка ответа, после отправки модального окна
-    async def callback(self, inter: disnake.ModalInteraction):
-        channel = await bot.fetch_channel(ADM_PUBLIC)
-        support_ticket = await channel.create_thread(
-            name="Обращение {}".format(inter.author.global_name),
-            type=disnake.ChannelType.private_thread,
-            invitable=False
-        )
-        Users.update(support_cooldown=datetime.datetime.now()).where(Users.discord_id == inter.author.id).execute()
-        await support_ticket.add_user(inter.author)
-        await inter.send('Обращение создано -<#{}>'.format(support_ticket.id), ephemeral=True)
-        embed = disnake.Embed(timestamp=datetime.datetime.now(),
-                              description="# ОБРАЩЕНИЕ: \n \n" + inter.data.components[0]["components"][0]["value"],
-                              color=disnake.Colour.green())
-        embed.add_field(name="Создатель обращения", value=f"<@{inter.author.id}>", inline=False)
-        start_msg = await support_ticket.send(embed=embed, components=[
-            disnake.ui.Button(label="Закрыть обращение", style=disnake.ButtonStyle.red,
-                              custom_id="close_support_ticket")])
-        Tickets.create(
-            thread=support_ticket.id, creator=inter.author.id, status="Open", create_date=datetime.datetime.now(),
-            start_msg=start_msg.id)
-        await support_ticket.send(f"-# <@&{POLICE}>, <@&{ADMIN}>")
-
-
-@bot.listen("on_button_click")
-async def support_listen(inter: disnake.MessageInteraction):
-    if inter.component.custom_id not in ["create_support_ticket", "close_support_ticket", ]:
-        return
-    if inter.component.custom_id == "create_support_ticket":
-        people = Users.get_or_none(discord_id=inter.author.id)
-        if people is None:
-            people = Users.create(discord_id=inter.author.id)
-        if (people.support_cooldown is None) or (people.support_cooldown + datetime.timedelta(minutes=45) < datetime.datetime.now()):
-            await inter.response.send_modal(modal=SupportModal())
-        else:
-            cooldown = people.support_cooldown + datetime.timedelta(minutes=45)
-            await inter.send(
-                f"Ты недавно уже создавал обращение в поддержку. Следующее можно будет только через <t:{round((cooldown - year1970).total_seconds())}:R>",
-                ephemeral=True)
-    if inter.component.custom_id == "close_support_ticket":
-        guild = bot.get_guild(servers)
-        people = guild.get_member(inter.author.id)
-        people_in_table = Users.get_or_none(discord_id=inter.author.id)
-        ticket_in_table = Tickets.get(start_msg=inter.message.id)
-        if people_in_table == None:
-            Users.create(discord_id=inter.author.id)
-        if ((guild.get_role(OWNER)) in people.roles) or (inter.author.id == ticket_in_table.creator):
-            thread = inter.channel
-            await inter.send(f'# ОБРАЩЕНИЕ БЫЛО ЗАКРЫТО\n-# Закрыто: <@{inter.author.id}>')
-            Tickets.update(status="Close").where(Tickets.start_msg == inter.message.id).execute()
-            await thread.edit(locked=True, archived=True)
-        else:
-            await inter.send(f"Закрыть обращение может только <@&{OWNER}> и создатель обращения", ephemeral=True)
-
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-
-# MAFIA
-
-mfdb = SqliteDatabase('mafia.db')
-
-
-class BaseModel(Model):
-    class Meta:
-        database = mfdb
-
-
-class Mafia(BaseModel):
-    id = AutoField()
-
-    # регистрация
-    reg_open = DateTimeField()
-    reg_duration = IntegerField()  # in seconds
-    reg_close = DateTimeField(null=True)  # после reg_duration или если набрались люди
-    min_players = IntegerField()
-    max_players = IntegerField()
-    password = TextField(null=True)  # for private games
-
-    game_start = DateTimeField(null=True)
-    game_finish = DateTimeField(null=True)
-
-    # настройки времени этапов
-    day_mode = TextField()  # day_duration and vote_duration progress mode, user defined
-    day_duration = IntegerField(null=True)  # in seconds
-    night_duration = IntegerField()  # in seconds, user defined
-    vote_duration = IntegerField(null=True)  # in seconds
-
-    # игроки и роли
-    game_creator = IntegerField()  # discord id
-    used_roles = JSONField(null=True)  # [role_name]
-    players = JSONField()  # [discord_id : role_name]
-    dead_players = JSONField(null=True)  # [discord_id]
-    alive_players = JSONField(null=True)  # [discord_id]
-    mafia_list = JSONField(null=True)  # [discord_id]
-    # current day
-    voted_already = JSONField(null=True)  # [discord_id]
-
-    # прочее
-    admin_key = TextField()  # key/token for admin access to game settings
-    players_list = TextField()  # str for registration embed
-    reg_msg_id = IntegerField(null=True)
-    mf_msg_id = IntegerField(null=True)  # discord id (int)
-    status = TextField() # game stage
-    action_history = TextField(null=True)  # action list
-    crush_status = TextField(null=True, default="Crush me")  # param for crushed def
-    game_thread = IntegerField(null=True)  # Game thread id
-    night_count = IntegerField(default=0)  # Счетчик ночей
-    day_count = IntegerField(default=0)  # Счетчик дней
-    voice_num = IntegerField()  # счетчик потоков
-    open_roles = TextField(null=True, default="NO")
-    info_history = TextField(null=True) # info of real voice_num + 'id = <@id>'
-
-class Players(BaseModel):
-    player_id = IntegerField()
-    status = TextField()
-    role = TextField(null=True)
-    game = IntegerField(null=True)
-    voted = IntegerField(null=True, default=0) # за кого проголосовал
-    crazy_role = TextField(null=True)
-    msg_id = IntegerField(null=True)
-    turn = IntegerField(null=True)
-    turn_check = TextField(null=True)
-    rating = IntegerField(default=350)
-    win_results = JSONField(null=True)
-    lose_results = JSONField(null=True)
-    unban_time = DateTimeField(null=True)
-
-
-Mafia.create_table()
-Players.create_table()
+import asyncio
+import random
+from disnake.ext import commands
+import string
+from disnake import TextInputStyle, TextInput
 
 roles = ["doctor", "detective", "mafia", "people", "people", "people", "baby", "people", "mafia", "police", "people",
          "crazy", "people", "thief", "mafia", "people"]
 
 win_count = {"mafia": 0, "people": 0, "doctor": 0, "detective": 0, "baby": 0, "police": 0, "crazy": 0, "thief": 0}
 mafia_room_0_id = 1289351607238262844
-
-# 6 игроков - Доктор, Детектив, Мафия, 3 Мирных
-# 7 игроков - Доктор, Детектив, Мафия, Красотка, 3 Мирных
-# 8 игроков - Доктор, Детектив, Мафия, Красотка, 4 Мирных
-# 9 игроков - Доктор, Детектив, 2 Мафии, Красотка, 3 Мирных
-# 10 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, 3 Мирных
-# 11 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, 4 Мирных
-# 12 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, 4 Мирных
-# 13 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, 5 Мирных
-# 14 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 5 Мирных
-# 15 игроков - Доктор, Детектив, 3 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 5 Мирных
-# 16 игроков - Доктор, Детектив, 3 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 6 Мирных
 
 
 class Mfstop_modal(disnake.ui.Modal):
@@ -381,6 +66,11 @@ class Mfstop_modal(disnake.ui.Modal):
                 Mafia.update(status="Stoped").where(Mafia.id == mfgame.id).execute()
                 await inter.send("Игра остановлена!", ephemeral=True)
                 await mafia_stop(mfgame, "night")
+
+
+###################################################################################
+###################################################################################
+###################################################################################
 
 
 class Mfinfo_modal(disnake.ui.Modal):
@@ -541,6 +231,100 @@ class Mfinfo_modal(disnake.ui.Modal):
         await inter.send(f"# ИНФОРМАЦИЯ О ИГРЕ #{mfgame.id}",embeds=[info_embed, count_embed, ids_embed, times_embed, durations_embed, players_roles_embed, reference_embed, action_history_embed], ephemeral=True)
 
 
+###################################################################################
+###################################################################################
+###################################################################################
+
+
+class PasswordModal(disnake.ui.Modal):
+    def __init__(self):
+        # Детали модального окна и его компонентов
+        components = [
+            disnake.ui.TextInput(
+                label="Введи пароль к приватной игре",
+                placeholder="Например, 12345678",
+                custom_id="password_field",
+                style=TextInputStyle.short,
+                min_length=8,
+                max_length=8
+            ),
+        ]
+        super().__init__(
+            title="Регистрация в приватную игру мафии",
+            custom_id="password_check",
+            components=components,
+        )
+
+    # Обработка ответа, после отправки модального окна
+    async def callback(self, inter: disnake.ModalInteraction):
+        mfgame = Mafia.get(Mafia.reg_msg_id == inter.message.id)
+        member = Players.get_or_none(Players.player_id == inter.author.id)
+        if member is None:
+            Players.create(player_id=inter.author.id, status="not_played",win_results=win_count, lose_results=win_count)
+        if inter.data.components[0]["components"][0]["value"] == mfgame.password:
+            players = (mfgame.players).copy()
+            players[inter.author.id] = None
+            Players.update(status='played',game=mfgame.id).where(Players.player_id == inter.author.id).execute()
+            Mafia.update(players_list=mfgame.players_list + f"\n-# <@{inter.author.id}>", players=players).where(mfgame).execute()
+            mfgame = Mafia.get(Mafia.reg_msg_id == inter.message.id)
+            guild = bot.get_guild(servers)
+            mafia_chat_object = await guild.fetch_channel(MAFIA)
+            chat_object = await mafia_chat_object.fetch_message(mfgame.reg_msg_id)
+            embed = disnake.Embed(
+                description=f"# МАФИЯ #{mfgame.id}\n## Начало через: <t:{round(((mfgame.reg_open + datetime.timedelta(seconds=mfgame.reg_duration) - year1970).total_seconds()))}:R>\n## Игроки:\n{mfgame.players_list}",
+            )
+
+            embed.set_image(url=mf_img_logo)
+            embed.add_field(name="Участвует:", value=len(mfgame.players), inline=True)
+            embed.add_field(name="Минимум:", value=mfgame.min_players, inline=True)
+            embed.add_field(name="Максимум:", value=mfgame.max_players, inline=True)
+            if mfgame.open_roles == "NO":
+                open_roles_embed_txt = "Роли засекречены"
+            elif mfgame.open_roles == "YES" and mfgame.max_players < 12:
+                open_roles_embed_txt = "Роли не засекречены"
+            else:
+                open_roles_embed_txt = "Роли не засекречены (если меньше 12 игроков)"
+            embed.add_field(name="Настройки:",
+                            value=f"Скорость дня: {mfgame.day_mode}\nДлительность ночи: {mfgame.night_duration} секунд\n{open_roles_embed_txt}",
+                            inline=False)
+            await inter.send("## Теперь ты участвуешь!", ephemeral=True)
+            overwrite_voice = disnake.PermissionOverwrite(speak=True, connect=True, view_channel=True)
+            guild = bot.get_guild(servers)
+            crt_member = guild.get_member(inter.author.id)
+            mfgame = Mafia.get(Mafia.id == mfgame.id)
+            mafia_room = mfgame.voice_num
+            if mafia_room == 1:
+                mafia_room = await bot.fetch_channel(MAFIA_ROOM_1)
+            if mafia_room == 2:
+                mafia_room = await bot.fetch_channel(MAFIA_ROOM_2)
+            if mafia_room == 3:
+                mafia_room = await bot.fetch_channel(MAFIA_ROOM_3)
+            await mafia_room.set_permissions(target=crt_member, overwrite=overwrite_voice)
+            if mfgame.max_players > len(mfgame.players):
+                embed.set_default_colour(disnake.Colour.yellow())
+                await chat_object.edit(embed=embed, components=[disnake.ui.Button(label="Участвовать", style=disnake.ButtonStyle.success,custom_id="join_private")])
+            else:
+                Mafia.update(reg_close=datetime.datetime.now(), game_start=datetime.datetime.now()+datetime.timedelta(seconds=30)).where(mfgame).execute()
+                mfgame = Mafia.get(Mafia.id == mfgame.id)
+                embed.set_default_colour(disnake.Colour.from_rgb(255, 255, 255))
+                await chat_object.edit(embed=embed, components=[
+                    disnake.ui.Button(label="Участвовать", disabled=True, style=disnake.ButtonStyle.success, custom_id="join_private")])
+        else:
+            await inter.send("## Неправильный пароль",ephemeral=True)
+
+# 6 игроков - Доктор, Детектив, Мафия, 3 Мирных
+# 7 игроков - Доктор, Детектив, Мафия, Красотка, 3 Мирных
+# 8 игроков - Доктор, Детектив, Мафия, Красотка, 4 Мирных
+# 9 игроков - Доктор, Детектив, 2 Мафии, Красотка, 3 Мирных
+# 10 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, 3 Мирных
+# 11 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, 4 Мирных
+# 12 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, 4 Мирных
+# 13 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, 5 Мирных
+# 14 игроков - Доктор, Детектив, 2 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 5 Мирных
+# 15 игроков - Доктор, Детектив, 3 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 5 Мирных
+# 16 игроков - Доктор, Детектив, 3 Мафии, Красотка, Полицейский, Сумасшедший, Вор, 6 Мирных
+
+
 async def mafia_night(mfgame):
     mafia_check_finish = False
 
@@ -589,10 +373,6 @@ async def mafia_night(mfgame):
             super().__init__()
             self.add_item(DoctorSelectMenu())
 
-
-
-
-
     class DetectiveSelectMenu(disnake.ui.StringSelect):
         def __init__(self):
             patients = (mfgame.alive_players).copy()
@@ -637,9 +417,6 @@ async def mafia_night(mfgame):
         def __init__(self):
             super().__init__()
             self.add_item(DetectiveSelectMenu())
-
-
-
 
     class BabySelectMenu(disnake.ui.StringSelect):
         def __init__(self):
@@ -688,8 +465,6 @@ async def mafia_night(mfgame):
             super().__init__()
             self.add_item(BabySelectMenu())
 
-
-
     class PoliceSelectMenu(disnake.ui.StringSelect):
         def __init__(self):
             police = Players.get((Players.game == mfgame.id) & (Players.role == "police"))
@@ -737,12 +512,6 @@ async def mafia_night(mfgame):
             super().__init__()
             self.add_item(PoliceSelectMenu())
 
-
-
-
-
-
-
     class ThiefSelectMenu(disnake.ui.StringSelect):
         def __init__(self):
             thief = Players.get((Players.game == mfgame.id) & (Players.role == "thief"))
@@ -787,7 +556,6 @@ async def mafia_night(mfgame):
         def __init__(self):
             super().__init__()
             self.add_item(ThiefSelectMenu())
-
 
     class MafiaSelectMenu(disnake.ui.StringSelect):
         def __init__(self):
@@ -886,9 +654,6 @@ async def mafia_night(mfgame):
         def __init__(self):
             super().__init__()
             self.add_item(PoliceCRZSelectMenu())
-
-
-
 
     class BabyCRZSelectMenu(disnake.ui.StringSelect):
         def __init__(self):
@@ -2985,220 +2750,4 @@ async def mafia_create_listen(inter: disnake.MessageInteraction):
 
 
         if inter.component.custom_id == "join_private":
-            class PasswordModal(disnake.ui.Modal):
-                def __init__(self):
-                    # Детали модального окна и его компонентов
-                    components = [
-                        disnake.ui.TextInput(
-                            label="Введи пароль к приватной игре",
-                            placeholder="Например, 12345678",
-                            custom_id="password_field",
-                            style=TextInputStyle.short,
-                            min_length=8,
-                            max_length=8
-                        ),
-                    ]
-                    super().__init__(
-                        title="Регистрация в приватную игру мафии",
-                        custom_id="password_check",
-                        components=components,
-                    )
-
-                # Обработка ответа, после отправки модального окна
-                async def callback(self, inter: disnake.ModalInteraction):
-                    mfgame = Mafia.get(Mafia.reg_msg_id == inter.message.id)
-                    member = Players.get_or_none(Players.player_id == inter.author.id)
-                    if member is None:
-                        Players.create(player_id=inter.author.id, status="not_played",win_results=win_count, lose_results=win_count)
-                    if inter.data.components[0]["components"][0]["value"] == mfgame.password:
-                        players = (mfgame.players).copy()
-                        players[inter.author.id] = None
-                        Players.update(status='played',game=mfgame.id).where(Players.player_id == inter.author.id).execute()
-                        Mafia.update(players_list=mfgame.players_list + f"\n-# <@{inter.author.id}>", players=players).where(mfgame).execute()
-                        mfgame = Mafia.get(Mafia.reg_msg_id == inter.message.id)
-                        guild = bot.get_guild(servers)
-                        mafia_chat_object = await guild.fetch_channel(MAFIA)
-                        chat_object = await mafia_chat_object.fetch_message(mfgame.reg_msg_id)
-                        embed = disnake.Embed(
-                            description=f"# МАФИЯ #{mfgame.id}\n## Начало через: <t:{round(((mfgame.reg_open + datetime.timedelta(seconds=mfgame.reg_duration) - year1970).total_seconds()))}:R>\n## Игроки:\n{mfgame.players_list}",
-                        )
-
-                        embed.set_image(url=mf_img_logo)
-                        embed.add_field(name="Участвует:", value=len(mfgame.players), inline=True)
-                        embed.add_field(name="Минимум:", value=mfgame.min_players, inline=True)
-                        embed.add_field(name="Максимум:", value=mfgame.max_players, inline=True)
-                        if mfgame.open_roles == "NO":
-                            open_roles_embed_txt = "Роли засекречены"
-                        elif mfgame.open_roles == "YES" and mfgame.max_players < 12:
-                            open_roles_embed_txt = "Роли не засекречены"
-                        else:
-                            open_roles_embed_txt = "Роли не засекречены (если меньше 12 игроков)"
-                        embed.add_field(name="Настройки:",
-                                        value=f"Скорость дня: {mfgame.day_mode}\nДлительность ночи: {mfgame.night_duration} секунд\n{open_roles_embed_txt}",
-                                        inline=False)
-                        await inter.send("## Теперь ты участвуешь!", ephemeral=True)
-                        overwrite_voice = disnake.PermissionOverwrite(speak=True, connect=True, view_channel=True)
-                        guild = bot.get_guild(servers)
-                        crt_member = guild.get_member(inter.author.id)
-                        mfgame = Mafia.get(Mafia.id == mfgame.id)
-                        mafia_room = mfgame.voice_num
-                        if mafia_room == 1:
-                            mafia_room = await bot.fetch_channel(MAFIA_ROOM_1)
-                        if mafia_room == 2:
-                            mafia_room = await bot.fetch_channel(MAFIA_ROOM_2)
-                        if mafia_room == 3:
-                            mafia_room = await bot.fetch_channel(MAFIA_ROOM_3)
-                        await mafia_room.set_permissions(target=crt_member, overwrite=overwrite_voice)
-                        if mfgame.max_players > len(mfgame.players):
-                            embed.set_default_colour(disnake.Colour.yellow())
-                            await chat_object.edit(embed=embed, components=[disnake.ui.Button(label="Участвовать", style=disnake.ButtonStyle.success,custom_id="join_private")])
-                        else:
-                            Mafia.update(reg_close=datetime.datetime.now(), game_start=datetime.datetime.now()+datetime.timedelta(seconds=30)).where(mfgame).execute()
-                            mfgame = Mafia.get(Mafia.id == mfgame.id)
-                            embed.set_default_colour(disnake.Colour.from_rgb(255, 255, 255))
-                            await chat_object.edit(embed=embed, components=[
-                                disnake.ui.Button(label="Участвовать", disabled=True, style=disnake.ButtonStyle.success,
-                                                  custom_id="join_private")])
-                    else:
-                        await inter.send("## Неправильный пароль",ephemeral=True)
             await inter.response.send_modal(modal=PasswordModal())
-
-
-###################################################################################
-###################################################################################
-###################################################################################
-
-
-# /cmd
-@bot.slash_command(guild_ids=[servers], description="Консоль")
-async def cmd(inter, command = disnake.ext.commands.Param(name='command', description='Консольная команда')):
-    command = command.lower()
-    guild = bot.get_guild(servers)
-    member = guild.get_member(inter.author.id)
-    user = bot.get_user(inter.author.id)
-    CLASSIS_CHAT = bot.get_guild(1139692253762297896)
-    CLASSIS_CHAT = CLASSIS_CHAT.get_channel(CHAT)
-    #school_179_th = CLASSIS_CHAT.get_thread(SCHOOL_179_THREAD)
-    #school_444_th = CLASSIS_CHAT.get_thread(SCHOOL_444_THREAD)
-    #school_1514_th = CLASSIS_CHAT.get_thread(SCHOOL_1514_THREAD)
-    print('stop')
-    if (command == "transgender"):
-        guild = bot.get_guild(servers)
-        man_role = guild.get_role(MAN)
-        fem_role = guild.get_role(FEM)
-        if ((bot.get_guild(servers)).get_role(MAN)) in inter.author.roles:
-            member = guild.get_member(inter.author.id)
-            await member.remove_roles(man_role)
-            await member.add_roles(fem_role)
-            await inter.send(f"Теперь ты <@&{FEM}>", ephemeral=True)
-        else:
-            member = guild.get_member(inter.author.id)
-            await member.remove_roles(fem_role)
-            await member.add_roles(man_role)
-            await inter.send(f"Теперь ты <@&{MAN}>",ephemeral=True)
-    elif (command == "valorant"):
-        valorant_role = guild.get_role(VALORANT)
-        valorant_th = CLASSIS_CHAT.get_thread(VALORANT_THREAD)
-        if ((bot.get_guild(servers)).get_role(VALORANT)) in inter.author.roles:
-            await valorant_th.remove_user(user)
-            await member.remove_roles(valorant_role)
-            await inter.send(f"Роль <@&{VALORANT}> снята",ephemeral=True)
-        else:
-            await member.add_roles(valorant_role)
-            await valorant_th.add_user(user)
-            await inter.send(f"Роль <@&{VALORANT}> добавлена",ephemeral=True)
-    elif (command == "cs"):
-        cs_role = guild.get_role(CS)
-        cs_th = CLASSIS_CHAT.get_thread(CS_THREAD)
-        if ((bot.get_guild(servers)).get_role(CS)) in inter.author.roles:
-            await cs_th.remove_user(user)
-            await member.remove_roles(cs_role)
-            await inter.send(f"Роль <@&{CS}> снята",ephemeral=True)
-        else:
-            await member.add_roles(cs_role)
-            await cs_th.add_user(user)
-            await inter.send(f"Роль <@&{CS}> добавлена",ephemeral=True)
-    elif (command == "minecraft"):
-        minecraft_role = guild.get_role(MINECRAFT)
-        minecraft_th = CLASSIS_CHAT.get_thread(MINECRAFT_THREAD)
-        if ((bot.get_guild(servers)).get_role(MINECRAFT)) in inter.author.roles:
-            await minecraft_th.remove_user(user)
-            await member.remove_roles(minecraft_role)
-            await inter.send(f"Роль <@&{MINECRAFT}> снята",ephemeral=True)
-        else:
-            await member.add_roles(minecraft_role)
-            await minecraft_th.add_user(user)
-            await inter.send(f"Роль <@&{MINECRAFT}> добавлена",ephemeral=True)
-    elif (command == "stalcraft"):
-        stalcraft_role = guild.get_role(STALCRAFT)
-        stalcraft_th = CLASSIS_CHAT.get_thread(STALCRAFT_THREAD)
-        if ((bot.get_guild(servers)).get_role(STALCRAFT)) in inter.author.roles:
-            await stalcraft_th.remove_user(user)
-            await member.remove_roles(stalcraft_role)
-            await inter.send(f"Роль <@&{STALCRAFT}> снята",ephemeral=True)
-        else:
-            await member.add_roles(stalcraft_role)
-            await stalcraft_th.add_user(user)
-            await inter.send(f"Роль <@&{STALCRAFT}> добавлена",ephemeral=True)
-    elif (command == "verify"):
-        guild = bot.get_guild(servers)
-        verify_role = guild.get_role(VERIFY)
-        member = guild.get_member(inter.author.id)
-        await member.add_roles(verify_role)
-    elif (command == "board"):
-        board_role = guild.get_role(BOARD)
-        board_th = CLASSIS_CHAT.get_thread(BOARD_THREAD)
-        if ((bot.get_guild(servers)).get_role(BOARD)) in inter.author.roles:
-            await board_th.remove_user(user)
-            await member.remove_roles(board_role)
-            await inter.send(f"Роль <@&{BOARD}> снята",ephemeral=True)
-        else:
-            await member.add_roles(board_role)
-            await board_th.add_user(user)
-            await inter.send(f"Роль <@&{BOARD}> добавлена",ephemeral=True)
-    elif (command == "mfstop"):
-        await inter.response.send_modal(modal=Mfstop_modal())
-    elif (command == "mfdocs"):
-        mfdocs_open = open("documents/mafia_docs.txt", "r", encoding="utf-8")
-        mfdocs_txt = mfdocs_open.read()
-        embed = disnake.Embed(description=mfdocs_txt, color=disnake.Colour.from_rgb(0, 255, 213),
-                              timestamp=datetime.datetime.now())
-        await inter.send(embed=embed, ephemeral=True)
-    elif (command == "cmd") or (command == "commands") or (command == "command") or (command == "list"):
-        commands_list_open = open("documents/commands_list.txt", "r", encoding="utf-8")
-        commands_list_txt = commands_list_open.read()
-        await inter.send(f"{commands_list_txt}",ephemeral=True)
-    elif (command == "mfinfo"):
-        await inter.response.send_modal(modal=Mfinfo_modal())
-    elif command == "rules":
-        guild = bot.get_guild(servers)
-        owner_role = guild.get_role(OWNER)
-        if owner_role not in inter.author.roles:
-            await inter.send("## В доступе отказано", ephemeral=True)
-            return
-        rules_open = open("documents/rules.txt", "r", encoding="utf-8")
-        rules_txt = rules_open.read()
-        embed = disnake.Embed(description=rules_txt, color=disnake.Colour.from_rgb(0, 255, 213),
-                              timestamp=datetime.datetime.now())
-        embed.set_footer(text="Вступили в силу")
-        chat = inter.channel
-        await chat.send(embed=embed)
-        await inter.send("Готово!", ephemeral=True)
-    elif command == "guide":
-        guild = bot.get_guild(servers)
-        owner_role = guild.get_role(OWNER)
-        if owner_role not in inter.author.roles:
-            await inter.send("## В доступе отказано", ephemeral=True)
-            return
-        guide_open = open("documents/guide.txt", "r", encoding="utf-8")
-        guide_txt = guide_open.read()
-        embed = disnake.Embed(description=guide_txt, color=disnake.Colour.from_rgb(255, 132, 0), )
-        chat = inter.channel
-        await chat.send(embed=embed)
-        await inter.send("Готово!", ephemeral=True)
-    else:
-        await inter.send(f"Команды ***{command}*** несуществует!", ephemeral=True)
-
-
-# Run
-bot.run(TOKEN)
