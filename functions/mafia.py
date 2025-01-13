@@ -1676,7 +1676,7 @@ async def mafia_day(mfgame, killed):
 
 
 @bot.slash_command(description='Выдать бан в мафии', guild_ids=[servers], name="mfban")
-async def mfban(inter, user : disnake.User, days : int = 0 , hours : int = 0, minutes : int = 0):
+async def mfban(inter, user : disnake.User = commands.Param(description="Выбери пользователя, которого надо забанить"), days : int = 0 , hours : int = 0, minutes : int = 0):
     """
                 Parameters
                 ----------
@@ -1694,7 +1694,7 @@ async def mfban(inter, user : disnake.User, days : int = 0 , hours : int = 0, mi
 
 
 @bot.slash_command(description='Снять бан в мафии', guild_ids=[servers], name="mfunban")
-async def mfunban(inter, user : disnake.User):
+async def mfunban(inter, user : disnake.User = commands.Param(description="Выбери пользователя, которого надо разбанить")):
     in_table = Players.get_or_none(player_id=user.id)
     if in_table is None:
         await inter.send(f"<@{user.id}> не был заблокирован", ephemeral=True)
@@ -1707,7 +1707,7 @@ async def mfunban(inter, user : disnake.User):
 
 
 @bot.slash_command(description='Получить данные о игроке', guild_ids=[servers], name="mf_pl_info")
-async def mf_pl_info(inter, user : disnake.User):
+async def mf_pl_info(inter, user: disnake.Member = commands.Param(description="Выбери пользователя, о котором хочешь спросить")):
     player = Players.get_or_none(player_id=user.id)
     if player == None:
         await inter.send(f"## <@{user.id}> не представлен в таблице игроков 'Мафии'", ephemeral=True)

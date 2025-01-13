@@ -11,7 +11,7 @@ import functions.update as update
 import functions.console as console
 import functions.mafia as mafia
 import functions.lofi as lofi
-
+import functions.report as report
 ###################################################################################
 ###################################################################################
 ###################################################################################

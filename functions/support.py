@@ -4,9 +4,6 @@ from variables import *
 from disnake import TextInputStyle
 
 
-support_cooldown = {}
-
-
 class SupportModal(disnake.ui.Modal):
     def __init__(self):
         # Детали модального окна и его компонентов
@@ -18,7 +15,7 @@ class SupportModal(disnake.ui.Modal):
                 style=TextInputStyle.paragraph,
                 min_length=12,
                 max_length=3750
-            ),
+            )
         ]
         super().__init__(
             title="Создание обращения",
@@ -73,7 +70,7 @@ async def support_listen(inter: disnake.MessageInteraction):
         else:
             cooldown = people.support_cooldown + datetime.timedelta(minutes=45)
             await inter.send(
-                f"Ты недавно уже создавал обращение в поддержку. Следующее можно будет только через <t:{round((cooldown - year1970).total_seconds())}:R>",
+                f"### Ты недавно уже создавал обращение в поддержку. Следующее можно будет только <t:{round((cooldown - year1970).total_seconds())}:R>",
                 ephemeral=True)
     if inter.component.custom_id == "close_support_ticket":
         guild = bot.get_guild(servers)
@@ -88,4 +85,4 @@ async def support_listen(inter: disnake.MessageInteraction):
             Tickets.update(status="Close").where(Tickets.start_msg == inter.message.id).execute()
             await thread.edit(locked=True, archived=True)
         else:
-            await inter.send(f"Закрыть обращение может только <@&{OWNER}> и создатель обращения", ephemeral=True)
+            await inter.send(f"### Закрыть обращение может только <@&{OWNER}> и создатель обращения", ephemeral=True)

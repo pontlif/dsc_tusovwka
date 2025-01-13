@@ -32,6 +32,7 @@ class Tickets(SERVERMODEL):
 class Users(SERVERMODEL):
     discord_id = IntegerField(null=False)  # dsc id пользователя
     support_cooldown = DateTimeField(null=True)  # Дата и время когда пользователь создал последнее обращение
+    report_cooldown = DateTimeField(null=True)  # Дата и время когда пользователь создал последнюю жалобу
 
 
 Tickets.create_table()

@@ -304,3 +304,6 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,pycharm+all 
+functions/note2.py
+functions/note.py
+functions/note3.py
