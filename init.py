@@ -7,7 +7,7 @@ from playhouse.sqlite_ext import JSONField
 ###################################################################################
 ###################################################################################
 
-intents = disnake.Intents.default()
+intents = disnake.Intents.all()
 intents.members = True  # Включение намерений для работы с членами сервера
 intents.messages = True  # Если нужен доступ к сообщениям
 intents.guilds = True    # Для работы с серверами

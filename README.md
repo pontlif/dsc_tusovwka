@@ -45,3 +45,7 @@
 
 ## МАФИЯ 🔪
 См. документацию для мафии
+
+***
+> Спасибо [LofiGirl](https://www.youtube.com/@LofiGirl) за Lofi музыку! <br>
+> Cпасибо за помощь [mimimiartartart](https://github.com/mimimiartartart) в разработке Lofi.

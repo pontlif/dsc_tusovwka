@@ -1,9 +1,10 @@
 import datetime
 from secret import files
 
-# Main Data (serverID, datetime object of Unix-zero-seconds)
+# Main Data (serverID, datetime object of Unix-zero-seconds, paths)
 servers = 1139692253762297896
 year1970 = datetime.datetime(1970, 1, 1, 3)
+opus_path = "/opt/homebrew/opt/opus/lib/libopus.dylib"
 ###################################################################################
 
 # Roles

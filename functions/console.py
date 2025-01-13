@@ -129,5 +129,21 @@ async def cmd(inter, command=disnake.ext.commands.Param(name='command', descript
         chat = inter.channel
         await chat.send(embed=embed)
         await inter.send("Готово!", ephemeral=True)
+    elif command == "lofi":
+        guild = bot.get_guild(servers)
+        owner_role = guild.get_role(OWNER)
+        if owner_role not in inter.author.roles:
+            await inter.send("## В доступе отказано", ephemeral=True)
+            return
+        lofi_open = open("documents/lofi.txt", "r", encoding="utf-8")
+        lofi_txt = lofi_open.read()
+        embed = disnake.Embed(description=lofi_txt, color=disnake.Colour.from_rgb(255, 132, 0), )
+        chat = inter.channel
+        await chat.send(embed=embed, components=[
+            disnake.ui.Button(label="Jazz", style=disnake.ButtonStyle.primary, custom_id="lofi_jazz"),
+            disnake.ui.Button(label="Christmas", style=disnake.ButtonStyle.success, custom_id="lofi_christmas"),
+            disnake.ui.Button(label="Classic", style=disnake.ButtonStyle.gray, custom_id="lofi_classic"),
+            disnake.ui.Button(label="Stop", style=disnake.ButtonStyle.danger, custom_id="lofi_stop"),])
+        await inter.send('Готово!', ephemeral=True)
     else:
         await inter.send(f"Команды ***{command}*** несуществует!", ephemeral=True)

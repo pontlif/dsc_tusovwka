@@ -10,6 +10,7 @@ import functions.support as support
 import functions.update as update
 import functions.console as console
 import functions.mafia as mafia
+import functions.lofi as lofi
 
 ###################################################################################
 ###################################################################################
@@ -40,11 +41,11 @@ async def on_ready():
 
 
 # MusicClear
-@bot.event
-async def on_message(message):
-    if (message.channel.id == MUSIC):
-        await asyncio.sleep(4)  # Задержка в 4 секунды
-        await message.delete()  # Удаление сообщения
+#@bot.event
+#async def on_message(message):
+    #if (message.channel.id == MUSIC):
+        #await asyncio.sleep(4)  # Задержка в 4 секунды
+        #await message.delete()  # Удаление сообщения
 
 
 # Run
