@@ -102,6 +102,8 @@ async def lofi_listen(inter: disnake.MessageInteraction):
         else:
             await inter.send("## Вы не находитесь в голосовом канале", ephemeral=True)
     elif inter.component.custom_id == "lofi_christmas":
+        await inter.send("## Сейчас этот lofi недоступен")
+        return
         if inter.user.voice and inter.user.voice.channel:
             await connectVoice(inter.user.voice.channel)
             await inter.send("## Играет Christmas", ephemeral=True)
