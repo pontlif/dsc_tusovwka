@@ -21,22 +21,44 @@ class SERVERMODEL(Model):
         database = db
 
 
-class Tickets(SERVERMODEL):
-    creator = IntegerField(null=False)  # dsc id создателя обращения
-    thread = IntegerField(null=False)  # dsc id ветки обращения
-    status = TextField(null=False)  # Статус обращения
-    create_date = DateTimeField(null=False)  # Дата и время создания обращения
-    start_msg = IntegerField(null=False)  # dsc id сообщения заявки
-
-
 class Users(SERVERMODEL):
-    discord_id = IntegerField(null=False)  # dsc id пользователя
-    support_cooldown = DateTimeField(null=True)  # Дата и время когда пользователь создал последнее обращение
-    report_cooldown = DateTimeField(null=True)  # Дата и время когда пользователь создал последнюю жалобу
+    """Таблица пользователей."""
+    id = AutoField(primary_key=True)  # Автоинкрементный ID
+    discord_id = IntegerField(null=True)  # Discord ID пользователя
+    support_cooldown = DateTimeField(null=True)  # Время последного обращения в поддержку
+    report_cooldown = DateTimeField(null=True)  # Время последней жалобы
+
+    def warns(self):
+        """Полученные предупреждения."""
+        return Warns.select().where(Warns.user == self)
+
+    def tickets(self):
+        """Созданные обращения."""
+        return Tickets.select().where(Tickets.creator == self)
+
+
+class Warns(SERVERMODEL):
+    """Таблица предупреждений."""
+    id = AutoField(primary_key=True)  # Автоинкрементный ID
+    moderator = ForeignKeyField(Users, backref='issued_warns', on_delete='CASCADE')  # Кто выдал предупреждение
+    user = ForeignKeyField(Users, backref='received_warns', on_delete='CASCADE')  # Кому выдано предупреждение
+    reason = TextField()  # Причина предупреждения
+    create_date = DateTimeField()  # Дата и время выдачи
+
+
+class Tickets(SERVERMODEL):
+    """Таблица обращений."""
+    id = AutoField(primary_key=True)  # Автоинкрементный ID
+    creator = ForeignKeyField(Users, backref='created_tickets', on_delete='CASCADE')  # Кто создал обращение
+    create_date = DateTimeField()  # Дата и время создания обращения
+    status = TextField()  # Статус обращения (например, 'open', 'closed')
+    start_msg = IntegerField()  # Содержание обращения
+    thread = IntegerField()  # ID ветки обращения
 
 
 Tickets.create_table()
 Users.create_table()
+Warns.create_table()
 
 
 ###################################################################################

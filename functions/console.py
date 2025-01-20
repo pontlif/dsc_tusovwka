@@ -144,5 +144,20 @@ async def cmd(inter, command=disnake.ext.commands.Param(name='command', descript
             disnake.ui.Button(label="Classic", style=disnake.ButtonStyle.gray, custom_id="lofi_classic"),
             disnake.ui.Button(label="Stop", style=disnake.ButtonStyle.danger, custom_id="lofi_stop"),])
         await inter.send('Готово!', ephemeral=True)
+    elif command == "support":
+        guild = bot.get_guild(servers)
+        owner_role = guild.get_role(OWNER)
+        if owner_role not in inter.author.roles:
+            await inter.send("## В доступе отказано", ephemeral=True)
+            return
+        support_open = open("documents/support.txt", "r", encoding="utf-8")
+        support_text = support_open.read()
+        await inter.send(
+            support_text,
+            components=[
+                disnake.ui.Button(
+                    label="Создать обращение",
+                    style=disnake.ButtonStyle.success,
+                    custom_id="create_support_ticket")])
     else:
         await inter.send(f"Команды ***{command}*** несуществует!", ephemeral=True)

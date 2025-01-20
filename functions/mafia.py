@@ -2634,7 +2634,7 @@ async def mafia_create(inter: disnake.ApplicationCommandInteraction,
     embed = disnake.Embed(
             description=f"# МАФИЯ #{mfgame.id}\n## Начало <t:{round(((mfgame.reg_open + datetime.timedelta(seconds=mfgame.reg_duration) - year1970).total_seconds()))}:R>\n## Игроки:\n{mfgame.players_list}",)
     embed.set_image(url=mf_img_logo)
-    if mfgame.password != None:
+    if mfgame.password is not None:
         embed.set_default_colour(disnake.Colour.yellow())
     else:
         embed.set_default_colour(disnake.Colour.green())
