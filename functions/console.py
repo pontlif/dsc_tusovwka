@@ -138,6 +138,7 @@ async def cmd(inter, command=disnake.ext.commands.Param(name='command', descript
         lofi_open = open("documents/lofi.txt", "r", encoding="utf-8")
         lofi_txt = lofi_open.read()
         embed = disnake.Embed(description=lofi_txt, color=disnake.Colour.from_rgb(255, 132, 0), )
+        embed.set_image(url=lofi_gif)
         chat = inter.channel
         await chat.send(embed=embed, components=[
             disnake.ui.Button(label="Jazz", style=disnake.ButtonStyle.primary, custom_id="lofi_jazz"),
