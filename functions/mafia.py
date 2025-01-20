@@ -2336,7 +2336,7 @@ async def mafia_game(mfgame):
         elif mfgame.open_roles == "NO":
             open_roles_embed_txt = "Роли засекречены"
         else:
-            open_roles_embed_txt = "Ошибка! error_id = 0003" #fixme 0003
+            open_roles_embed_txt = "Ошибка! error_id = 0003"  #fixme 0003
         embed.add_field(name="Настройки:",
                         value=f"Скорость дня: {mfgame.day_mode}\nДлительность ночи: {mfgame.night_duration} секунд\n{open_roles_embed_txt}",
                         inline=False)
@@ -2344,7 +2344,7 @@ async def mafia_game(mfgame):
         await chat_object.edit(embed=embed, components=[
             disnake.ui.Button(label="Участвовать", style=disnake.ButtonStyle.success,
                               custom_id="join_cl", disabled=True)])
-        Mafia.update(status="Players < Minimal_players", crush_status="No crush").where(Mafia.id == mfgame.id).execute()
+        Mafia.update(status="Players < Minimal_players", crush_status="No crush", voice_num=0).where(Mafia.id == mfgame.id).execute()
         pplstrt = (mfgame.players).copy()
         pplstrt = list(pplstrt.keys())
         for player in pplstrt:
