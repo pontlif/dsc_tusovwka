@@ -22,7 +22,7 @@ import functions.report as report
 async def on_ready():
     print(f'Бот запущен. Я - {bot.user}')
     await bot.change_presence(
-        activity=disnake.Activity(type=disnake.ActivityType.custom, name="tusovwka", state="Тестируется"))
+        activity=disnake.Activity(type=disnake.ActivityType.custom, name="tusovwka", state="Купи слона🐘"))
     chat_chat = await bot.fetch_channel(CHAT)
     # await chat_chat.send("## Всем привет! Я снова в сети и служу Наша Туса.")
     mfgame_object = Mafia.get_or_none(crush_status="Crush me")
